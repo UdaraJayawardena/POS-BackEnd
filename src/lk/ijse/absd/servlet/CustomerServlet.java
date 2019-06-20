@@ -5,6 +5,7 @@ import javax.json.Json;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
+import javax.json.stream.JsonParsingException;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -23,30 +24,52 @@ public class CustomerServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        System.out.println("Search Working...");
 
-        String ids = req.getParameter("id");
+        String ids = req.getParameter("cusSid");
+        System.out.println("doGet ID : " + ids);
+
+        Connection connection = null;
 
         if (ids != null) {
+            System.out.println("Search Working...");
             try {
-                Class.forName("com.mysql.jdbc.Driver");
-                Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/ThogaKade", "root", "12345");
+                PrintWriter outs = resp.getWriter();
+                resp.setContentType("application/json");
 
+                connection = ds.getConnection();
                 PreparedStatement pstm = connection.prepareStatement("SELECT * FROM Customer WHERE id=?");
                 pstm.setObject(1, ids);
 
                 ResultSet rst = pstm.executeQuery();
+
+                JsonArrayBuilder customersS = Json.createArrayBuilder();
 
                 if (rst.next()) {
                     String name = rst.getString(2);
                     String address = rst.getString(3);
                     String salary = String.valueOf(rst.getDouble(4));
 
+                    System.out.println("name : " + name);
+                    System.out.println("address : " + address);
+                    System.out.println("salary : " + salary);
+
+                    JsonObject customer = Json.createObjectBuilder()
+                            .add("id", ids)
+                            .add("name", name)
+                            .add("address", address)
+                            .add("salary", salary)
+                            .build();
+                    customersS.add(customer);
+
+                    outs.println(customersS.build().toString());
+
+
                 } else {
                     try (PrintWriter out = resp.getWriter()) {
                         out.println("{}");
                     }
                 }
+
             } catch (Exception ex) {
                 try (PrintWriter out = resp.getWriter()) {
                     out.println("{}");
@@ -61,9 +84,9 @@ public class CustomerServlet extends HttpServlet {
                 resp.setContentType("application/json");
 
                 try {
-                    Connection connection = ds.getConnection();
+                    Connection connections = ds.getConnection();
 
-                    Statement stm = connection.createStatement();
+                    Statement stm = connections.createStatement();
                     ResultSet rst = stm.executeQuery("SELECT * FROM Customer");
 
                     JsonArrayBuilder customers = Json.createArrayBuilder();
@@ -85,7 +108,7 @@ public class CustomerServlet extends HttpServlet {
 
                     out.println(customers.build().toString());
 
-                    connection.close();
+                    connections.close();
                 } catch (Exception ex) {
                     resp.sendError(500, ex.getMessage());
                     ex.printStackTrace();
@@ -98,7 +121,7 @@ public class CustomerServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        System.out.println("Save Working...");
+        System.out.println("doPost Working...");
         JsonReader reader = Json.createReader(req.getReader());
         resp.setContentType("application/json");
 
@@ -108,10 +131,17 @@ public class CustomerServlet extends HttpServlet {
 
         try {
             JsonObject customer = reader.readObject();
+
             String id = customer.getString("id");
             String name = customer.getString("name");
             String address = customer.getString("address");
             String salary = customer.getString("salary");
+
+            System.out.println("id : " + id);
+            System.out.println("Name : " + name);
+            System.out.println("Address : " + address);
+            System.out.println("Salary : " + salary);
+
 
             connection = ds.getConnection();
 
@@ -120,9 +150,11 @@ public class CustomerServlet extends HttpServlet {
             pstm.setObject(2, name);
             pstm.setObject(3, address);
             pstm.setObject(4, salary);
+
             boolean result = pstm.executeUpdate() > 0;
 
             if (result) {
+
                 out.println("true");
             } else {
                 out.println("false");
@@ -144,14 +176,15 @@ public class CustomerServlet extends HttpServlet {
     @Override
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         System.out.println("Delete Working...");
-        String id = req.getParameter("id");
-        if (id != null) {
+
+        String cid = req.getParameter("cusid");
+
+        if (cid != null) {
 
             try {
-                Class.forName("com.mysql.jdbc.Driver");
-                Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/ThogaKade", "root", "12345");
+                Connection connection = ds.getConnection();
                 PreparedStatement pstm = connection.prepareStatement("DELETE FROM Customer WHERE id=?");
-                pstm.setObject(1, id);
+                pstm.setObject(1, cid);
                 int affectedRows = pstm.executeUpdate();
                 if (affectedRows > 0) {
                     resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
@@ -162,37 +195,60 @@ public class CustomerServlet extends HttpServlet {
                 resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 ex.printStackTrace();
             }
-
         } else {
             resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
     }
 
+
     @Override
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         System.out.println("Update Working...");
-        if (req.getParameter("id") != null) {
+
+        Connection connection = null;
+//        System.out.println("id : " + req.getParameter("id"));
+//        System.out.println(req.getParameter("id") != null);
+
+        JsonReader reader = Json.createReader(req.getReader());
+        JsonObject customer = reader.readObject();
+
+        if (customer.getString("id") != null) {
+
+            System.out.println(customer);
 
             try {
-                JsonReader reader = Json.createReader(req.getReader());
-                JsonObject customer = reader.readObject();
+
+
+//                if (!id.equals(customer.getString("id"))) {
+//                    System.out.println("hhhhhh");
+//                    resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
+//                    return;
+//                }
+
+//                Class.forName("com.mysql.jdbc.Driver");
+                connection = ds.getConnection();
+//                connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/ThogaKade", "root", "12345");
+                PreparedStatement pstm = connection.prepareStatement("UPDATE Customer SET name=?, address=? salary=? WHERE id=?");
+
 
                 String id = customer.getString("id");
                 String name = customer.getString("name");
                 String address = customer.getString("address");
+                String salary = customer.getString("salary");
 
-                if (!id.equals(req.getParameter("id"))) {
-                    resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
-                    return;
-                }
+                System.out.println("id : " + id);
+                System.out.println("name : " + name);
+                System.out.println("address : " + address);
+                System.out.println("salary : " + salary);
 
-                Class.forName("com.mysql.jdbc.Driver");
-                Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/ThogaKade", "root", "12345");
-                PreparedStatement pstm = connection.prepareStatement("UPDATE Customer SET name=?, address=? WHERE id=?");
-                pstm.setObject(3, id);
+                pstm.setObject(4, id);
                 pstm.setObject(1, name);
                 pstm.setObject(2, address);
+                pstm.setObject(3, salary);
+                System.out.println("ddd" + pstm);
                 int affectedRows = pstm.executeUpdate();
+
+                System.out.println("affected Rows : " + affectedRows);
 
                 if (affectedRows > 0) {
                     resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
@@ -200,7 +256,7 @@ public class CustomerServlet extends HttpServlet {
                     resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 }
 
-            } catch (NullPointerException ex) {
+            } catch (JsonParsingException | NullPointerException ex) {
                 resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
             } catch (Exception ex) {
                 resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -210,5 +266,7 @@ public class CustomerServlet extends HttpServlet {
         } else {
             resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
         }
+
+
     }
 }

@@ -12,7 +12,7 @@ public class AuthServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-
+        System.out.println("doPost from AuthServlet");
         try (PrintWriter out = resp.getWriter()) {
 
             String username = req.getParameter("username");
